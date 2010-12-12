@@ -27,11 +27,12 @@
 // The IP address will be dependent on your local network:
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192,168,1,177 }; 
-byte server[] = { 216,68,104,242 }; // portal.hive13.org
+byte server[] = { 216,68,104,242 }; // www.hive13.org
 //byte server[] = {192.168.1.37 }; // laptop:eth0@hive13
 
 int switchStatus = UNKNOWN;
-bool needToStop = false;
+boolean needToStop = false;
+boolean conSuccess = false;
 
 // Initialize the Ethernet client library
 // with the IP address and port of the server 
@@ -73,7 +74,7 @@ void loop()
     int curRead = digitalRead(openPin);
     
     // Did it change?
-    if(curRead != switchStatus) {
+    if(curRead != switchStatus || !conSuccess) {
       startGet(curRead);
       switchStatus = curRead;
     } else {
@@ -93,8 +94,11 @@ void loop()
 void startGet(int switchState) {
     // Check if we are already connected.
     if(!client.connected()) {
+      conSuccess = false;
       // We are not, so lets connect.
       if(client.connect()) {
+        conSuccess = true;
+        
         // Yay! We connected.
         Serial.println("connected");
         
@@ -108,7 +112,8 @@ void startGet(int switchState) {
         // What now?
         Serial.println("connection failed");
       }
-      
+    } else {
+      delay(20000);
     }
 }
 
