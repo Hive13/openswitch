@@ -1,0 +1,29 @@
+The 'Door Switch' or 'Is the Hackerspace Open?' switch has two main software 
+components:
+1. The microcontroller client code.
+2. The webserver database and webpages.
+
+######### 1. The Microcontroller ########
+~~ The electrical components ~~
+1. A standard lightswitch
+2. An Arduino clone a Diavolino 
+    -( http://www.evilmadscientist.com/article.php/diavolino )
+3. An Arduino Ethernet Shield 
+    -( http://www.arduino.cc/en/Main/ArduinoEthernetShield )
+    - *note* The linked version is lightly newer, current version does not have
+             the Micro-SD card adaptor.
+             
+~~ The Code ~~
+The code is based off of the Arduino Ethernet Shield example code for a web
+client.  The micro remembers the last state of the switch, when the state changes
+it sends out an HTTP 'GET' request to the webserver to 
+'isOpen/logger.php?switch=[0|1]'. A switch state of '0' means the hackerspace is 
+closed, a switch state of '1' means the hackerspace is open.
+
+######### 2. The Webserver ########
+The webserver contains several parts:
+1. A MySQL database with a 'doorEvents' table.
+2. The logger.php page which accepts 'get' requests from client.
+3. The checkStatus.php which polls the database for the current door status.
+4. An index.html which uses javascript to refresh the icon when the status 
+   changes.
