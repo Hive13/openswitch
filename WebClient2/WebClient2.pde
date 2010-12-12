@@ -27,7 +27,8 @@
 // The IP address will be dependent on your local network:
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192,168,1,177 }; 
-byte server[] = { 192,168,1,51 }; // Google
+byte server[] = { 216,68,104,242 }; // portal.hive13.org
+//byte server[] = {192.168.1.37 }; // laptop:eth0@hive13
 
 int switchStatus = UNKNOWN;
 bool needToStop = false;
@@ -98,7 +99,7 @@ void startGet(int switchState) {
         Serial.println("connected");
         
         // Lets make the request:
-        client.print("GET /logger.php?switch=");
+        client.print("GET /isOpen/logger.php?switch=");
         client.println(switchState, DEC);
         
         needToStop = true;
