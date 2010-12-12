@@ -1,0 +1,35 @@
+<html>
+<head>
+<title>isOpen Widget</title>
+<script type="text/javascript">
+var lastText="";
+function showStatus() {
+    if(window.XMLHttpRequest) {
+      xmlhttp=new XMLHttpRequest();
+    } else {
+      xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+    }
+
+    xmlhttp.onreadystatechange=function() {
+	if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+		var newText = xmlhttp.responseText;
+		if(newText != lastText) {
+			document.getElementById("status").innerHTML=xmlhttp.responseText;
+		}
+
+	}
+    }
+
+    xmlhttp.open("GET","checkStatus.php", true);
+    xmlhttp.send();
+}
+
+    var refreshId = setInterval( "showStatus()", 1000);
+
+
+</script>
+</head>
+<body bgcolor=white>
+<div id="status">Checking status...</div>
+</body>
+</html>
