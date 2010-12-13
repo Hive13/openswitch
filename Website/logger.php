@@ -1,13 +1,10 @@
 <?php
 
   header('Content-Type: text/plain; charset=utf-8');
-
-
-  $dbh = mysql_connect('localhost', 'username','password');
-  if(!$dbh) {
-    die("Bork Bork! " . mysql_error());
-  }
-  mysql_select_db("channellog", $dbh);
+  
+  require('func.php');
+  $conf = loadconfig('doorlogger.config.php');
+  $dbh = getdbhandle($conf);
 
   if(isSet($_REQUEST['switch'])) {
     if($_REQUEST['switch'] == '0' ||
