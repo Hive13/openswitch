@@ -21,14 +21,15 @@
 
 #define openPin 7
 #define closedPin 8
-
+#define openLED 14
+#define closedLED 15
 
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192,168,1,177 }; 
 byte server[] = { 216,68,104,242 }; // www.hive13.org
-//byte server[] = {192.168.1.37 }; // laptop:eth0@hive13
+//byte server[] = {192,168,1,37 }; // laptop:eth0@hive13
 
 int switchStatus = UNKNOWN;
 boolean needToStop = false;
@@ -52,10 +53,13 @@ void setup() {
   digitalWrite(closedPin, HIGH);
   pinMode(openPin, INPUT);
   pinMode(closedPin, INPUT);
+  pinMode(openLED, OUTPUT);
+  pinMode(closedLED, OUTPUT);
   
   switchStatus = digitalRead(openPin);
   Serial.println(switchStatus);
   startGet(switchStatus);
+  setLED(switchStatus);
 }
 
 void loop()
@@ -76,6 +80,7 @@ void loop()
     // Did it change?
     if(curRead != switchStatus || !conSuccess) {
       startGet(curRead);
+      setLED(curRead);
       switchStatus = curRead;
     } else {
       // Wait two seconds.
@@ -91,6 +96,15 @@ void loop()
   }
 }
 
+void setLED(int switchState) {
+  if(switchState == OPEN) {
+    digitalWrite(openLED, HIGH);
+    digitalWrite(closedLED, LOW);
+  } else {
+    digitalWrite(openLED, LOW);
+    digitalWrite(closedLED, HIGH);
+  }
+}
 void startGet(int switchState) {
     // Check if we are already connected.
     if(!client.connected()) {

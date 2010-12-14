@@ -4,6 +4,6 @@
 
 # DB access used by frontend and logger
 db_host = localhost
-db_user = paulbot
-db_pass = paulb0t
+db_user = username 
+db_pass = password
 db_name = channellog
