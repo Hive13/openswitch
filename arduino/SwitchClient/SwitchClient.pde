@@ -59,7 +59,6 @@ void setup() {
   switchStatus = digitalRead(openPin);
   Serial.println(switchStatus);
   startGet(switchStatus);
-  setLED(switchStatus);
 }
 
 void loop()
@@ -80,7 +79,6 @@ void loop()
     // Did it change?
     if(curRead != switchStatus || !conSuccess) {
       startGet(curRead);
-      setLED(curRead);
       switchStatus = curRead;
     } else {
       // Wait two seconds.
@@ -105,6 +103,7 @@ void setLED(int switchState) {
     digitalWrite(closedLED, HIGH);
   }
 }
+
 void startGet(int switchState) {
     // Check if we are already connected.
     if(!client.connected()) {
@@ -121,6 +120,9 @@ void startGet(int switchState) {
         client.println(switchState, DEC);
         
         needToStop = true;
+        
+        // Now that we have connected, lets change the LED.
+        setLED(switchState);
       } else {
         // Failed to connect, and I am not connected.
         // What now?
