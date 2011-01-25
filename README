@@ -20,6 +20,19 @@ it sends out an HTTP 'GET' request to the webserver to
 'isOpen/logger.php?switch=[0|1]'. A switch state of '0' means the hackerspace is 
 closed, a switch state of '1' means the hackerspace is open.
 
+~~ Known Issues ~~
+After power cycling the switch (aka, the arduino w/ Ethernet shield) the
+ethernet shield will fail to connect to the network.  This is apparently a
+known issue with the ethernet shield and is related to it not getting enough
+juice on startup.  A couple suggested fixes are as follows:
+1. Add a 200 ms sleep into the "setup()" function to reduice initial power 
+   requirements of the 3.3v line.  I am not sure how well this would work.
+2. Add a resistor & capacitor to the "reset" pin of the ethernet shield, this
+   also seems to work by disabling the shield until enough power is available
+   to charge the capacitor and it then provides a bit more stability on the
+   3.3v line.
+*. http://www.arduino.cc/cgi-bin/yabb2/YaBB.pl?num=1225354009/15
+
 ######### 2. The Webserver ########
 The webserver contains several parts:
 1. A MySQL database with a 'doorEvents' table.

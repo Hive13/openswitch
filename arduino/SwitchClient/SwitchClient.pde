@@ -1,14 +1,14 @@
 /*
-  Web client
+  Door Open // Closed Switch
+  Derivative of: Web client by David A. Mellis.
  
- This sketch connects to a website (http://www.google.com)
+ This sketch connects to a website
  using an Arduino Wiznet Ethernet shield. 
  
  Circuit:
  * Ethernet shield attached to pins 10, 11, 12, 13
- 
- created 18 Dec 2009
- by David A. Mellis
+ * Switch is connected to pins 7, 8
+ * LED's are connected to pins 14, 15
  
  */
 
@@ -21,6 +21,7 @@
 
 #define openPin 7
 #define closedPin 8
+
 #define openLED 14
 #define closedLED 15
 
