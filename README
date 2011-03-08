@@ -6,7 +6,7 @@ components:
 ######### 1. The Microcontroller ########
 ~~ The electrical components ~~
 1. A standard lightswitch
-2. An Arduino clone a Diavolino 
+2. Diavolino, an Arduino clone  
     -( http://www.evilmadscientist.com/article.php/diavolino )
 3. An Arduino Ethernet Shield 
     -( http://www.arduino.cc/en/Main/ArduinoEthernetShield )

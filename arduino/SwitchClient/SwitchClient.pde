@@ -23,9 +23,10 @@
 // the ethernet shield.
 #define START_DELAY 200
 
-#define OPEN 1
-#define CLOSED 0
 #define UNKNOWN -1
+#define CLOSED 0
+#define OPEN 1
+#define ERROR 2
 
 #define openPin 7
 #define closedPin 8
@@ -121,12 +122,20 @@ void loop()
 }
 
 void setLED(int switchState) {
-  if(switchState == OPEN) {
+  if(switchState == OPEN) { // Is the switch in the OPEN position?
     digitalWrite(openLED, HIGH);
     digitalWrite(closedLED, LOW);
-  } else {
+  } else if(switchState == CLOSED){ // Is the switch in the CLOSED position?
     digitalWrite(openLED, LOW);
     digitalWrite(closedLED, HIGH);
+  } else if(switchState == ERROR) {     // We are in an ERROR state...
+    if(digitalRead(openLED) == HIGH) {  // Is the open LED currently lit?
+      digitalWrite(openLED, HIGH);      // - Yes, turn both LEDs on.
+      digitalWrite(closedLED, HIGH);
+    } else {                            // - No, turn both LEDs off.
+      digitalWrite(openLED, LOW);
+      digitalWrite(closedLED, LOW);
+    }
   }
 }
 
@@ -162,6 +171,10 @@ void startGet(int switchState) {
         //           or perhaps how long, we have been failing to connect.
         //           If it crosses a certain threshold, then we should somehow
         //           show some kind of alert, perhaps blink both LEDs?
+        
+        // Blink the LED's
+        setLED(ERROR);
+        delay(250); // Wait a few seconds before we try again.
       }
     } else {
       delay(20000);
