@@ -15,6 +15,8 @@
 #include <SPI.h>
 #include <Ethernet.h>
 
+//#define DEBUG 1
+
 // This delay is used to give the Ethernet shield time to finish initializing.
 // Apparently it has a hefty draw on the 3v line on startup, if the Arduino
 // is also drawing significant current on the 3v line it causes issues w/
@@ -53,12 +55,19 @@ void setup() {
 
   // start the Ethernet connection:
   Ethernet.begin(mac, ip);
-  // start the serial library:
-  Serial.begin(9600);
+  
   // give the Ethernet shield a second to initialize:
-  delay(1000);
-  Serial.println("connecting...");
+  delay(2000);
+  
+#ifdef DEBUG
+    // start the serial library:
+    Serial.begin(9600);
+    Serial.println("connecting...");
+#endif
 
+    
+  }
+  
   digitalWrite(openPin, HIGH);
   digitalWrite(closedPin, HIGH);
   pinMode(openPin, INPUT);
@@ -67,7 +76,9 @@ void setup() {
   pinMode(closedLED, OUTPUT);
   
   switchStatus = digitalRead(openPin);
+#ifdef DEBUG
   Serial.println(switchStatus);
+#endif
   startGet(switchStatus);
 }
 
@@ -77,9 +88,12 @@ void loop()
   if (!client.connected()) {
     // Did we just disconnect?
     if(needToStop) {
-      Serial.println();
-      Serial.println("disconnecting.");
-      client.stop();
+#ifdef DEBUG
+        Serial.println();
+        Serial.println("disconnecting.");
+#endif
+        client.stop();
+      }
       needToStop = false;
     }
     
@@ -99,7 +113,9 @@ void loop()
     // from the server, read them and print them:
     if (client.available()) {
       char c = client.read();
+#ifdef DEBUG
       Serial.print(c);
+#endif
     }
   }
 }
@@ -123,7 +139,9 @@ void startGet(int switchState) {
         conSuccess = true;
         
         // Yay! We connected.
+#ifdef DEBUG
         Serial.println("connected");
+#endif
         
         // Lets make the request:
         client.print("GET /isOpen/logger.php?switch=");
@@ -136,8 +154,9 @@ void startGet(int switchState) {
       } else {
         // Failed to connect, and I am not connected.
         // What now?
+#ifdef DEBUG
         Serial.println("connection failed");
-        
+#endif
         // TODO_PTV: Add code here to reset the arduino.
         // TODO_PTV: We should probably also keep track of how many times
         //           or perhaps how long, we have been failing to connect
