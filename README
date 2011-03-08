@@ -21,6 +21,7 @@ it sends out an HTTP 'GET' request to the webserver to
 closed, a switch state of '1' means the hackerspace is open.
 
 ~~ Known Issues ~~
+----- Issue 1 ------
 After power cycling the switch (aka, the arduino w/ Ethernet shield) the
 ethernet shield will fail to connect to the network.  This is apparently a
 known issue with the ethernet shield and is related to it not getting enough
@@ -32,6 +33,14 @@ juice on startup.  A couple suggested fixes are as follows:
    to charge the capacitor and it then provides a bit more stability on the
    3.3v line.
 *. http://www.arduino.cc/cgi-bin/yabb2/YaBB.pl?num=1225354009/15
+- TODO: Make a GitHub issue related to this issue
+
+----- Issue 2 ------
+We should add a feature to somehow alert a user if the "http get" connection
+fails repeatedly.  Maybe we should also attempt to ping an address that
+absolutely should exist, aka 192.168.1.1 or 8.8.8.8.  If we can contact
+192.x then the internal network is good, if we can hit 8.8.8.8 then the
+internet connection is good.
 
 ######### 2. The Webserver ########
 The webserver contains several parts:
