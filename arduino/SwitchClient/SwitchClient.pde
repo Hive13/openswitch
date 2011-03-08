@@ -42,6 +42,9 @@ boolean conSuccess = false;
 Client client(server, 80);
 
 void setup() {
+  // TODO_PTV: Add code here to delay the startup to allow the ethernet
+  //           shield to finish booting.
+
   // start the Ethernet connection:
   Ethernet.begin(mac, ip);
   // start the serial library:
@@ -128,6 +131,8 @@ void startGet(int switchState) {
         // Failed to connect, and I am not connected.
         // What now?
         Serial.println("connection failed");
+        
+        // TODO_PTV: Add code here to reset the arduino.
       }
     } else {
       delay(20000);
