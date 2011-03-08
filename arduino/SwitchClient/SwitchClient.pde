@@ -15,6 +15,12 @@
 #include <SPI.h>
 #include <Ethernet.h>
 
+// This delay is used to give the Ethernet shield time to finish initializing.
+// Apparently it has a hefty draw on the 3v line on startup, if the Arduino
+// is also drawing significant current on the 3v line it causes issues w/
+// the ethernet shield.
+#define START_DELAY 200
+
 #define OPEN 1
 #define CLOSED 0
 #define UNKNOWN -1
@@ -42,8 +48,8 @@ boolean conSuccess = false;
 Client client(server, 80);
 
 void setup() {
-  // TODO_PTV: Add code here to delay the startup to allow the ethernet
-  //           shield to finish booting.
+  // See comment at #define START_DELAY
+  delay(START_DELAY);
 
   // start the Ethernet connection:
   Ethernet.begin(mac, ip);
