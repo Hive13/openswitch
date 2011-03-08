@@ -139,6 +139,10 @@ void startGet(int switchState) {
         Serial.println("connection failed");
         
         // TODO_PTV: Add code here to reset the arduino.
+        // TODO_PTV: We should probably also keep track of how many times
+        //           or perhaps how long, we have been failing to connect
+        //           if it crosses a certain threshold, then we should somehow
+        //           show some kind of alert, perhaps blink both LEDs?
       }
     } else {
       delay(20000);
