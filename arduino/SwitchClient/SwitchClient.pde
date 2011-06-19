@@ -14,26 +14,28 @@
 
 #include <SPI.h>
 #include <Ethernet.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include "floatToString.h"
 
-//#define DEBUG 1
-
-// This delay is used to give the Ethernet shield time to finish initializing.
-// Apparently it has a hefty draw on the 3v line on startup, if the Arduino
-// is also drawing significant current on the 3v line it causes issues w/
-// the ethernet shield.
-#define START_DELAY 200
-
-#define UNKNOWN -1
-#define CLOSED 0
 #define OPEN 1
-#define ERROR 2
+#define CLOSED 0
+#define UNKNOWN -1
 
-#define openPin 7
-#define closedPin 8
+#define openPin 15
+#define closedPin 14
 
-#define openLED 14
-#define closedLED 15
+#define openLED 7
+#define closedLED 8
 
+// Temperature wire is plugged into port 2 on the Arduino
+#define ONE_WIRE_BUS 16
+
+// 300,000 ms = 5 minutes
+int TEMP_INTERVAL = 300000;
+
+int DOOR_EVENT = 0;
+int TEMP_EVENT = 1;
 // Enter a MAC address and IP address for your controller below.
 // The IP address will be dependent on your local network:
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -45,30 +47,34 @@ int switchStatus = UNKNOWN;
 boolean needToStop = false;
 boolean conSuccess = false;
 
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+
+// Pass our oneWire reference to Dallas Temperature. 
+DallasTemperature sensors(&oneWire);
+
 // Initialize the Ethernet client library
 // with the IP address and port of the server 
 // that you want to connect to (port 80 is default for HTTP):
 Client client(server, 80);
 
 void setup() {
-  // See comment at #define START_DELAY
-  delay(START_DELAY);
 
+  // Delay for 2 seconds to allow for the ethernet switch
+  // to start.
+  delay(5000); // 2 seconds did not work, not sure if 5 will
+  
   // start the Ethernet connection:
   Ethernet.begin(mac, ip);
   
   // give the Ethernet shield a second to initialize:
   delay(2000);
   
-#ifdef DEBUG
-    // start the serial library:
-    Serial.begin(9600);
-    Serial.println("connecting...");
-#endif
-
-    
-  }
+  // start the serial library:
+  Serial.begin(9600);
   
+  Serial.println("connecting...");
+
   digitalWrite(openPin, HIGH);
   digitalWrite(closedPin, HIGH);
   pinMode(openPin, INPUT);
@@ -77,11 +83,17 @@ void setup() {
   pinMode(closedLED, OUTPUT);
   
   switchStatus = digitalRead(openPin);
-#ifdef DEBUG
   Serial.println(switchStatus);
-#endif
   startGet(switchStatus);
+  
+  // Start the temperature Sensor
+  sensors.begin();
 }
+
+int loopDelay = 2000;
+// 5 minutes / loopDelay = how m
+int sensorTrigger = TEMP_INTERVAL/loopDelay; 
+int sensorCount = 0;
 
 void loop()
 {
@@ -89,12 +101,9 @@ void loop()
   if (!client.connected()) {
     // Did we just disconnect?
     if(needToStop) {
-#ifdef DEBUG
-        Serial.println();
-        Serial.println("disconnecting.");
-#endif
-        client.stop();
-      }
+      Serial.println();
+      Serial.println("disconnecting.");
+      client.stop();
       needToStop = false;
     }
     
@@ -105,41 +114,44 @@ void loop()
     if(curRead != switchStatus || !conSuccess) {
       startGet(curRead);
       switchStatus = curRead;
+    } else if(sensorTrigger <= sensorCount) {
+      // Has it been 5 minutes since this section triggered?
+      // Yes, do the following:
+      startGet(curRead, TEMP_EVENT);
+      sensorCount = 0;
+      // - Reset the timer
     } else {
       // Wait two seconds.
-      delay(2000);
+      delay(loopDelay);
+      
+      // Up the sensor count by one.
+      sensorCount += 1;
     }
   } else { // We are connected now.
     // if there are incoming bytes available 
     // from the server, read them and print them:
     if (client.available()) {
       char c = client.read();
-#ifdef DEBUG
       Serial.print(c);
-#endif
     }
   }
 }
 
 void setLED(int switchState) {
-  if(switchState == OPEN) { // Is the switch in the OPEN position?
+  if(switchState == OPEN) {
     digitalWrite(openLED, HIGH);
     digitalWrite(closedLED, LOW);
-  } else if(switchState == CLOSED){ // Is the switch in the CLOSED position?
+  } else {
     digitalWrite(openLED, LOW);
     digitalWrite(closedLED, HIGH);
-  } else if(switchState == ERROR) {     // We are in an ERROR state...
-    if(digitalRead(openLED) == HIGH) {  // Is the open LED currently lit?
-      digitalWrite(openLED, HIGH);      // - Yes, turn both LEDs on.
-      digitalWrite(closedLED, HIGH);
-    } else {                            // - No, turn both LEDs off.
-      digitalWrite(openLED, LOW);
-      digitalWrite(closedLED, LOW);
-    }
   }
 }
 
 void startGet(int switchState) {
+  startGet(switchState, DOOR_EVENT); 
+}
+
+void startGet(int switchState, int eventType) {
     // Check if we are already connected.
     if(!client.connected()) {
       conSuccess = false;
@@ -148,13 +160,18 @@ void startGet(int switchState) {
         conSuccess = true;
         
         // Yay! We connected.
-#ifdef DEBUG
         Serial.println("connected");
-#endif
         
         // Lets make the request:
-        client.print("GET /isOpen/logger.php?switch=");
-        client.println(switchState, DEC);
+        if(DOOR_EVENT == eventType) {
+          client.print("GET /isOpen/logger.php?switch=");
+          client.println(switchState, DEC);
+        } else if(TEMP_EVENT == eventType) {
+          char dataArray[16] = "";
+          floatToString(dataArray, sensors.getTempFByIndex(0), 2);
+          client.print("GET /isOpen/logger.php?temp=");
+          client.println(dataArray);
+        }
         
         needToStop = true;
         
@@ -163,21 +180,11 @@ void startGet(int switchState) {
       } else {
         // Failed to connect, and I am not connected.
         // What now?
-#ifdef DEBUG
         Serial.println("connection failed");
-#endif
-        // TODO_PTV: Add code here to reset the arduino.
-        // TODO_PTV: We should probably also keep track of how many times
-        //           or perhaps how long, we have been failing to connect.
-        //           If it crosses a certain threshold, then we should somehow
-        //           show some kind of alert, perhaps blink both LEDs?
         
-        // Blink the LED's
-        setLED(ERROR);
-        delay(250); // Wait a few seconds before we try again.
+        // TODO_PTV: Add code here to reset the arduino.
       }
     } else {
       delay(20000);
     }
 }
-
