@@ -30,7 +30,7 @@
     else
       $feed .= '<title>Hive13 is closed.</title>';
     
-    $feed .= '<link></link>
+    $feed .= '<link>http://www.hive13.org</link>
               <description></description>
               <pubDate>'.date(DATE_RSS, strtotime($row['dtEventDate'])).'</pubDate>
             </item>';
