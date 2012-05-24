@@ -56,7 +56,7 @@ DallasTemperature sensors(&oneWire);
 // Initialize the Ethernet client library
 // with the IP address and port of the server 
 // that you want to connect to (port 80 is default for HTTP):
-Client client(server, 80);
+EthernetClient client;
 
 void setup() {
 
