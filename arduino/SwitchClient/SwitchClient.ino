@@ -1,15 +1,18 @@
 /*
-  Web client
- 
- This sketch connects to a website (http://www.google.com)
- using an Arduino Wiznet Ethernet shield. 
+  Switch Client
  
  Circuit:
  * Ethernet shield attached to pins 10, 11, 12, 13
+ * OneWire Dallas temp sensor connected to pin 16
+ * Open // Closed LED's connected to pins 7, 8
+ * One // Closed switch connected to pins 15, 14
  
- created 18 Dec 2009
- modified 9 Apr 2012
- by David A. Mellis
+ created 26 May 2012
+ modified 29 May 2012
+ by Paul Vincent
+ 
+ Loosely derived from the Arduino Ethernet WebClient
+ example program by David A. Mellis
  
  */
 
@@ -32,6 +35,7 @@
 #define UNKNOWN -1
 
 // Enums for specifying request types
+#define REQUEST_FAILED       -1
 #define REQUEST_FINISHED      0
 #define REQUEST_DOOR_EVENT    1
 #define REQUEST_TEMP_EVENT    2
@@ -78,7 +82,7 @@ void setup() {
   pinMode(CLOSED_PIN, INPUT_PULLUP);
   pinMode(OPEN_LED_PIN,   OUTPUT);
   pinMode(CLOSED_LED_PIN, OUTPUT);
-  setLED(UNKNOWN);
+  setLED(UNKNOWN);  // Turn on all LED's to indicate we are in "startup" mode.
   
  // Open serial communications and wait for port to open:
   Serial.begin(9600);
@@ -107,8 +111,15 @@ void setup() {
 
 // Perform a get request to the logger page.
 // Parameters:
-//  requestType   
-void startGetRequest(int requestType, int data = 0) {
+//  requestType   Use one of the REQUEST_* enums
+//         data   Tacked onto URL parameters for certain requests, 
+//                ignored if not needed.
+//
+// Returns:
+//    True if the "Get" request succeeded
+//    False if the "Get" request failed.
+bool startGetRequest(int requestType, int data = 0) {
+  bool result = false;
   current_request_state = requestType;
   
   String requestString = "GET /isOpen/logger.php";
@@ -139,12 +150,15 @@ void startGetRequest(int requestType, int data = 0) {
     client.print("HOST: ");
     client.println(serverName);
     client.println();
+    result = true;
   } else {
     Serial.print("HTTP connect for ");
     Serial.print(requestString);
     Serial.println(" failed.");
+    result = false;
   }
   
+  return result;
 }
 
 // Returns true if the switch has changed position since
@@ -179,41 +193,46 @@ void setLED(int switchState) {
 
 void loop()
 {
+  int curPos = -1;
   if( client.connected()) {
-    Serial.println("Client is connected.");
-    delay(1000);
+    Serial.print("Got [");
+    delay(1000);  // First delay to allow the client to cache some of the incoming data
     while( client.available() && client.connected()) {
       // read incoming bytes:
       char inChar = client.read();
       Serial.print(inChar);
-      delay(30);
+      delay(30);  // Second delay to ensure that we do not overrun the end of the buffer before it is empty.
     }
-    Serial.println("Finished reading...");
-    client.stop();
+    Serial.println("]");
+    client.stop();  // If this is missing, all subsequent "get" requests WILL fail.
   }
   else if (millis() - last_status_check > STATUS_INTERVAL) { // Is it time to check for a status update?
     Serial.println("Checking status...");
-    startGetRequest(REQUEST_STATUS_CHECK, 0);
-    last_status_check = millis();
+    if(startGetRequest(REQUEST_STATUS_CHECK, 0))
+      last_status_check = millis(); // Only update the "Last Check" time if the get request succeeded.
   }
   else if (millis() - last_temp_update > TEMP_INTERVAL) { // Is it time for a temperature update 'Get'?
     Serial.println("Logging temperature...");
     float tempC = sensors.getTempCByIndex(0);
     sensors.requestTemperatures();
-    startGetRequest(REQUEST_TEMP_EVENT, DallasTemperature::toFahrenheit(tempC)); // TODO: Add code to figure out the temperature.
-    last_temp_update = millis();
+    if(startGetRequest(REQUEST_TEMP_EVENT, DallasTemperature::toFahrenheit(tempC)))
+      last_temp_update = millis();  // Only update the "Last Update" time if the get request succeeded.
   }
-  else if (checkSwitchStatus()) { // If switch position has changed perform 'Get'
+  else if ((curPos = getSwitchPosition()) != current_switch_status) { // If switch position has changed perform 'Get'
     Serial.print("Switch status is now: ");
     Serial.println(current_switch_status, DEC);
-    startGetRequest(REQUEST_DOOR_EVENT, current_switch_status);
-    setLED(current_switch_status);
+    if(startGetRequest(REQUEST_DOOR_EVENT, curPos)) {
+      setLED(curPos); // Only update the LED if get request succeeded.
+      current_switch_status = curPos; // Same goes for the saved status.
+    }
   }
   else {
-    client.stop(); // Close the connection.
-    client.flush();
-    Serial.println("...");
-    delay(5000);
+    client.stop();  // If the client is not connected, lets make sure all connections are stopped.
+    client.flush(); // Also, lets make sure that the client has nothing waiting in the buffer.
+    Serial.println("...");  // Spit out a progress debug message.
+    
+    // TODO: Maybe move this delay out into the main loop? Arguement against: There would be a 5 second delay between the "get" and status update locally.
+    delay(5000);    // Now sleep for 5 seconds before we check our status.
   }
 }
 
