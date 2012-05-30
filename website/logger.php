@@ -41,17 +41,4 @@
     echo "$safeTemp";
   }
 
-  if(isSet($_REQUEST['tempReport'])) {
-    if($_REQUEST['tempReport'] == '1') {
-      // if = 1, read the last temperature
-      echo "Temperature Report:\n";
-      $qry = "SELECT dtEventDate, dcTemp FROM tempEvents ORDER BY dtEventDate DESC LIMIT 75";
-      $res = mysql_query($qry, $dbh);
-      while( $row = mysql_fetch_array($res, MYSQL_ASSOC)) {
-        echo $row['dtEventDate'].",".$row['dcTemp']."\n";
-      }
-      mysql_close($dbh);
-    }
-  }
-
 ?>
