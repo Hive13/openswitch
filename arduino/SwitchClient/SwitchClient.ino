@@ -11,6 +11,9 @@
  modified 29 May 2012
  by Paul Vincent
  
+ modified 2/2/13
+ by Allen Voter
+ 
  Loosely derived from the Arduino Ethernet WebClient
  example program by David A. Mellis
  
@@ -52,6 +55,7 @@ unsigned long last_status_check = -1;
 unsigned long last_temp_update = -1;
 int current_switch_status = UNKNOWN;
 int current_request_state = REQUEST_FINISHED;
+int led_flash = LOW;
 
 // Enter a MAC address for your controller below.
 // Newer Ethernet shields have a MAC address printed on a sticker on the shield
@@ -59,7 +63,7 @@ byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress server(216,68,104,242); // Hive13.org IP
 char serverName[] = "hive13.org";  // Hive13 URL
 
-IPAddress ip(192,168,1,180); // Backup local IP in case of DHCP fail
+IPAddress ip(172,16,2,235); // Backup local IP in case of DHCP fail
 
 // Initialize the Ethernet client library
 // with the IP address and port of the server 
@@ -92,11 +96,13 @@ void setup() {
 
   Serial.println("Attempting to acquire ip through DHCP...");
   // start the Ethernet connection:
-  if (Ethernet.begin(mac) == 0) {
+  // DHCP is not working well in the HIVE 2/2/13, disabled for now
+//  if (Ethernet.begin(mac) == 0) {
     // if DHCP fails, start with a hard-coded address:
-    Serial.println("failed to get an IP address using DHCP, trying manually");
+//    Serial.println("failed to get an IP address using DHCP, trying manually");
     Ethernet.begin(mac, ip);
-  }
+//  }
+
   // give the Ethernet shield a second to initialize:
   delay(1000);
 
@@ -152,6 +158,14 @@ bool startGetRequest(int requestType, int data = 0) {
     client.println();
     result = true;
   } else {
+    // turn off open light in case of error, only red light slowly flashes
+    digitalWrite(OPEN_LED_PIN, LOW);
+    //Flash LED
+    digitalWrite(CLOSED_LED_PIN, led_flash);    // sets the LED off
+    if(led_flash==HIGH)
+      led_flash=LOW;
+    else
+      led_flash=HIGH;
     Serial.print("HTTP connect for ");
     Serial.print(requestString);
     Serial.println(" failed.");
