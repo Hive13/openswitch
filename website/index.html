@@ -23,8 +23,8 @@ function showStatus() {
     xmlhttp.open("GET","checkStatus.php", true);
     xmlhttp.send();
 }
-
-    var refreshId = setInterval( "showStatus()", 1000);
+showStatus();
+var refreshId = setInterval( "showStatus()", 30000);
 
 
 </script>

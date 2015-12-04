@@ -41,4 +41,28 @@
     echo "$safeTemp";
   }
 
+  if(isSet($_REQUEST['sodatemp'])) {
+    // Add whatever was passed in to the text file
+    echo "Saving temperature...\n";
+    $safeTemp = mysql_real_escape_string($_REQUEST['sodatemp']);
+    $qry = "INSERT INTO tempEvents (dcTemp, vcLocation)
+            VALUES ($safeTemp, 'SodaMachine')";
+    $res = mysql_query($qry,$dbh);
+    mysql_close($dbh);
+    echo "$safeTemp";
+  }
+
+  if(isSet($_REQUEST['tempReport'])) {
+    if($_REQUEST['tempReport'] == '1') {
+      // if = 1, read the last temperature
+      echo "Temperature Report:\n";
+      $qry = "SELECT dtEventDate, dcTemp FROM tempEvents ORDER BY dtEventDate DESC LIMIT 288";
+      $res = mysql_query($qry, $dbh);
+      while( $row = mysql_fetch_array($res, MYSQL_ASSOC)) {
+        echo $row['dtEventDate'].",".$row['dcTemp']."\n";
+      }
+      mysql_close($dbh);
+    }
+  }
+
 ?>
