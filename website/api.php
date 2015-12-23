@@ -16,8 +16,8 @@
   echo '"space":"Hive13",';
   echo '"logo":"http://www.hive13.org/wp-uploads/2011/08/HIVE.jpg",';
   echo '"icon":{';
-    echo '"open":"http://www.hive13.org/isOpen/open-100x100.png",';
-    echo '"closed":"http://www.hive13.org/isOpen/closed-100x100.png" ';
+    echo '"open":"http://www.hive13.org/artwork/open-100x100.png",';
+    echo '"closed":"http://www.hive13.org/artwork/closed-100x100.png" ';
   echo '},';
   echo '"url":"http://www.hive13.org/",';
   echo '"address":"2929 Spring Grove Ave. Cincinnati, OH 45225", ';

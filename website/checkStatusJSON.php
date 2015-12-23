@@ -9,10 +9,8 @@
   $res = mysql_query($sql);
   $row = mysql_fetch_array($res);
   if($row['bDoorIsOpen'] == 1) {
-    //echo '<img src=open.png width=100px height=43px>';
     echo '{ "isOpen" : 1 }';
   } else {
-    //echo '<img src=closed.png width=100px height=43px>';
     echo '{ "isOpen" : 0 }';
   }
   mysql_close($con);

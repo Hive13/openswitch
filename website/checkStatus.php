@@ -8,9 +8,9 @@
   $res = mysql_query($sql);
   $row = mysql_fetch_array($res);
   if($row['bDoorIsOpen'] == 1) {
-    echo '<img src=open.png width=100px height=43px>';
+    echo '<img src=/artwork/open.png width=100px height=43px>';
   } else {
-    echo '<img src=closed.png width=100px height=43px>';
+    echo '<img src=/artwork/closed.png width=100px height=43px>';
   }
   mysql_close($con);
 ?>
