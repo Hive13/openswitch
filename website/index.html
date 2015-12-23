@@ -3,30 +3,28 @@
 <title>isOpen Widget</title>
 <script type="text/javascript">
 var lastText="";
-function showStatus() {
-    if(window.XMLHttpRequest) {
-      xmlhttp=new XMLHttpRequest();
-    } else {
-      xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
-    }
-
-    xmlhttp.onreadystatechange=function() {
-	if (xmlhttp.readyState==4 && xmlhttp.status==200) {
-		var newText = xmlhttp.responseText;
-		if(newText != lastText) {
-			document.getElementById("status").innerHTML=xmlhttp.responseText;
+function showStatus()
+	{
+	if (window.XMLHttpRequest)
+		xmlhttp = new XMLHttpRequest();
+	else
+		xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+	
+	xmlhttp.onreadystatechange=function()
+		{
+		if (xmlhttp.readyState == 4 && xmlhttp.status == 200)
+			{
+			var j = JSON.parse(xmlhttp.responseText);
+			document.getElementById("status").innerHTML = j.isOpenImg;
+			}
 		}
-
+	
+	xmlhttp.open("GET","status.php", true);
+	xmlhttp.send();
 	}
-    }
 
-    xmlhttp.open("GET","checkStatus.php", true);
-    xmlhttp.send();
-}
 showStatus();
-var refreshId = setInterval( "showStatus()", 30000);
-
-
+var refreshId = setInterval("showStatus()", 30000);
 </script>
 </head>
 <body bgcolor=white>
