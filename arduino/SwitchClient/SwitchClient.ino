@@ -1,36 +1,20 @@
 /*
-  Switch Client
- 
- Circuit:
- * Ethernet shield attached to pins 10, 11, 12, 13
- * OneWire Dallas temp sensor connected to pin 16
- * Open // Closed LED's connected to pins 7, 8
- * One // Closed switch connected to pins 15, 14
- 
- created 26 May 2012
- modified 29 May 2012
- by Paul Vincent
- 
- modified 2/2/13
- by Allen Voter
- 
- Loosely derived from the Arduino Ethernet WebClient
- example program by David A. Mellis
- 
+ *  This sketch sends data via HTTP GET requests to data.sparkfun.com service.
+ *
+ *  You need to get streamId and privateKey at data.sparkfun.com and paste them
+ *  below. Or just customize this script to talk to other HTTP servers.
+ *
  */
 
-#include <SPI.h>
-#include <Ethernet.h>
+#include <ESP8266WiFi.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// Pin mode setup
-// - ethernet pins: 10, 11, 12, 13
-#define OPEN_PIN        15
-#define CLOSED_PIN      14
-#define OPEN_LED_PIN    7
-#define CLOSED_LED_PIN  8
-#define ONE_WIRE_BUS    16
+#define OPEN_PIN        D7
+#define CLOSED_PIN      D5
+#define OPEN_LED_PIN    D1
+#define CLOSED_LED_PIN  D2
+#define ONE_WIRE_BUS    D3
 
 // Enums for tracking door status
 #define OPEN     1
@@ -57,18 +41,10 @@ int current_switch_status = UNKNOWN;
 int current_request_state = REQUEST_FINISHED;
 int led_flash = LOW;
 
-// Enter a MAC address for your controller below.
-// Newer Ethernet shields have a MAC address printed on a sticker on the shield
-byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress server(216,68,104,242); // Hive13.org IP
-char serverName[] = "hive13.org";  // Hive13 URL
+const char* ssid     = "hive13int";
+const char* password = "hive13int";
 
-IPAddress ip(172,16,2,235); // Backup local IP in case of DHCP fail
-
-// Initialize the Ethernet client library
-// with the IP address and port of the server 
-// that you want to connect to (port 80 is default for HTTP):
-EthernetClient client;
+const char* host = "portal.hive13.org";
 
 // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
@@ -79,100 +55,17 @@ DallasTemperature sensors(&oneWire);
 // arrays to hold device address
 DeviceAddress tempSensor;
 
-
-void setup() {
-  // Setup the digital IO pins
-  pinMode(OPEN_PIN,   INPUT_PULLUP);
-  pinMode(CLOSED_PIN, INPUT_PULLUP);
-  pinMode(OPEN_LED_PIN,   OUTPUT);
-  pinMode(CLOSED_LED_PIN, OUTPUT);
-  setLED(UNKNOWN);  // Turn on all LED's to indicate we are in "startup" mode.
-  
- // Open serial communications and wait for port to open:
-  Serial.begin(9600);
-   while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-  }
-
-  Serial.println("Attempting to acquire ip through DHCP...");
-  // start the Ethernet connection:
-  // DHCP is not working well in the HIVE 2/2/13, disabled for now
-//  if (Ethernet.begin(mac) == 0) {
-    // if DHCP fails, start with a hard-coded address:
-//    Serial.println("failed to get an IP address using DHCP, trying manually");
-    Ethernet.begin(mac, ip);
-//  }
-
-  // give the Ethernet shield a second to initialize:
-  delay(1000);
-
-  Serial.print("My address:");
-  Serial.println(Ethernet.localIP());
-  
-  // Start setup for the temperature sensors
-  Serial.println("Setting up temperature sensor...");
-  sensors.begin();
-  
-}
-
-// Perform a get request to the logger page.
-// Parameters:
-//  requestType   Use one of the REQUEST_* enums
-//         data   Tacked onto URL parameters for certain requests, 
-//                ignored if not needed.
-//
-// Returns:
-//    True if the "Get" request succeeded
-//    False if the "Get" request failed.
-bool startGetRequest(int requestType, int data = 0) {
-  bool result = false;
-  current_request_state = requestType;
-  
-  String requestString = "GET /isOpen/logger.php";
-  // build request parameters
-  switch(requestType) {
-    case REQUEST_DOOR_EVENT:
-      requestString.concat("?switch=");
-      requestString.concat(data);
-      break;
-    case REQUEST_TEMP_EVENT:
-      requestString.concat("?temp=");
-      requestString.concat(data);
-      break;
-    case REQUEST_FINISHED: // Should not occur, rather than error, lets continue.
-    case REQUEST_STATUS_CHECK:
-      // We can use the base request string.
-      break;
-  }
-  //Serial.println(requestString);
-  
-  // Try to use DNS first, if that fails, fallback to the IP address
-  if(client.connect(serverName, 80) || client.connect(server, 80)) {
-    Serial.print("Connected, making request: ");
-    Serial.println(requestString);
-    
-    // Make the HTTP Get request to hive13:
-    client.println(requestString);
-    client.print("HOST: ");
-    client.println(serverName);
-    client.println();
-    result = true;
-  } else {
-    // turn off open light in case of error, only red light slowly flashes
+void setLED(int switchState) {
+  if(switchState == OPEN) {
+    digitalWrite(OPEN_LED_PIN, HIGH);
+    digitalWrite(CLOSED_LED_PIN, LOW);
+  } else if(switchState == CLOSED){
     digitalWrite(OPEN_LED_PIN, LOW);
-    //Flash LED
-    digitalWrite(CLOSED_LED_PIN, led_flash);    // sets the LED off
-    if(led_flash==HIGH)
-      led_flash=LOW;
-    else
-      led_flash=HIGH;
-    Serial.print("HTTP connect for ");
-    Serial.print(requestString);
-    Serial.println(" failed.");
-    result = false;
+    digitalWrite(CLOSED_LED_PIN, HIGH);
+  } else {
+    digitalWrite(OPEN_LED_PIN, HIGH);
+    digitalWrite(CLOSED_LED_PIN, HIGH);
   }
-  
-  return result;
 }
 
 // Returns true if the switch has changed position since
@@ -189,38 +82,121 @@ bool checkSwitchStatus() {
 // Returns OPEN, CLOSED depending on
 // the position of the door switch.
 int getSwitchPosition() {
+  Serial.println(digitalRead(OPEN_PIN));
   return digitalRead(OPEN_PIN);
 }
 
-void setLED(int switchState) {
-  if(switchState == OPEN) {
-    digitalWrite(OPEN_LED_PIN, HIGH);
-    digitalWrite(CLOSED_LED_PIN, LOW);
-  } else if(switchState == CLOSED){
-    digitalWrite(OPEN_LED_PIN, LOW);
-    digitalWrite(CLOSED_LED_PIN, HIGH);
-  } else {
-    digitalWrite(OPEN_LED_PIN, HIGH);
-    digitalWrite(CLOSED_LED_PIN, HIGH);
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+
+  // We start by connecting to a WiFi network
+
+  Serial.println();
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  
+  WiFi.begin(ssid, password);
+  
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
+
+  Serial.println("");
+  Serial.println("WiFi connected");  
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  
+    // Setup the digital IO pins
+  pinMode(OPEN_PIN,   INPUT_PULLUP);
+  pinMode(CLOSED_PIN, INPUT_PULLUP);
+  pinMode(OPEN_LED_PIN,   OUTPUT);
+  pinMode(CLOSED_LED_PIN, OUTPUT);
+  setLED(UNKNOWN);  // Turn on all LED's to indicate we are in "startup" mode.
+  
+  // Start setup for the temperature sensors
+  Serial.println("Setting up temperature sensor...");
+  sensors.begin();
 }
 
-void loop()
-{
-  int curPos = -1;
-  if( client.connected()) {
-    Serial.print("Got [");
-    delay(1000);  // First delay to allow the client to cache some of the incoming data
-    while( client.available() && client.connected()) {
-      // read incoming bytes:
-      char inChar = client.read();
-      Serial.print(inChar);
-      delay(30);  // Second delay to ensure that we do not overrun the end of the buffer before it is empty.
-    }
-    Serial.println("]");
-    client.stop();  // If this is missing, all subsequent "get" requests WILL fail.
+bool startGetRequest(int requestType, int data) {
+  delay(500);
+
+  Serial.print("connecting to ");
+  Serial.println(host);
+  
+  // Use WiFiClient class to create TCP connections
+  WiFiClient client;
+  const int httpPort = 80;
+  if (!client.connect(host, httpPort)) {
+    Serial.println("connection failed");
+    return 0;
   }
-  else if (millis() - last_status_check > STATUS_INTERVAL) { // Is it time to check for a status update?
+  
+  // We now create a URI for the request
+  String url = "/isOpen/logger.php";
+  
+  switch(requestType) {
+    case REQUEST_DOOR_EVENT:
+      url += "?switch=";
+      url += data;
+      break;
+    case REQUEST_TEMP_EVENT:
+      url += "?temp=";
+      url += data;
+      break;
+    case REQUEST_FINISHED: // Should not occur, rather than error, lets continue.
+    case REQUEST_STATUS_CHECK:
+      // We can use the base request string.
+      break;
+  }
+  
+  Serial.print("Requesting URL: ");
+  Serial.println(url);
+  
+  // This will send the request to the server
+  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" + 
+               "Connection: close\r\n\r\n");
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      return 0;
+    }
+  }
+  
+  // Read all the lines of the reply from server and print them to Serial
+  while(client.available()){
+    String line = client.readStringUntil('\r');
+    Serial.print(line);
+  }
+  
+  Serial.println();
+  Serial.println("closing connection");
+  return 1;
+}
+
+
+
+/*void loop() {
+  delay(5000);
+  startGetRequest(1,1);
+  if (WiFi.status() == WL_CONNECTED)
+*/
+
+int curPos = STATUS_INTERVAL;
+
+void loop() {
+  Serial.println(millis() - last_status_check);
+  Serial.println(STATUS_INTERVAL);
+  Serial.println(getSwitchPosition());
+
+  delay(1000);
+  if (millis() - last_status_check > STATUS_INTERVAL) { // Is it time to check for a status update?
     Serial.println("Checking status...");
     if(startGetRequest(REQUEST_STATUS_CHECK, 0))
       last_status_check = millis(); // Only update the "Last Check" time if the get request succeeded.
@@ -240,17 +216,5 @@ void loop()
       current_switch_status = curPos; // Same goes for the saved status.
     }
   }
-  else {
-    client.stop();  // If the client is not connected, lets make sure all connections are stopped.
-    client.flush(); // Also, lets make sure that the client has nothing waiting in the buffer.
-    Serial.println("...");  // Spit out a progress debug message.
-    
-    // TODO: Maybe move this delay out into the main loop? Arguement against: There would be a 5 second delay between the "get" and status update locally.
-    delay(5000);    // Now sleep for 5 seconds before we check our status.
-  }
+  int curPos = -1;
 }
-
-
-
-
-
