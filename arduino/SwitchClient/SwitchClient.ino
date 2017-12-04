@@ -41,8 +41,8 @@ int current_switch_status = UNKNOWN;
 int current_request_state = REQUEST_FINISHED;
 int led_flash = LOW;
 
-const char* ssid     = "hive13int";
-const char* password = "hive13int";
+const char* ssid     = "Enter Wifi SSID Here";
+const char* password = "Enter Wifi Password Here";
 
 const char* host = "portal.hive13.org";
 
