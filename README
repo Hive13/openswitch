@@ -6,13 +6,18 @@ components:
 ######### 1. The Microcontroller ########
 ~~ The electrical components ~~
 1. A standard lightswitch
-2. ESP8266 WiFi based microcontroller
+2. An Arduino Mega with Ethernet Board
              
 ~~ The Code ~~
 The micro remembers the last state of the switch, when the state changes
 it sends out an HTTP 'GET' request to the webserver to 
 'isOpen/logger.php?switch=[0|1]'. A switch state of '0' means the hackerspace is 
 closed, a switch state of '1' means the hackerspace is open.
+
+~~ Light Status Codes ~~
+Waiting for response: Both LEDs solid
+Cannot contact the network: Alternating blink of both LEDs
+Cannot reach server: Simultaneous blink of both LEDS
 
 ######### 2. The Webserver ########
 The webserver contains several parts:

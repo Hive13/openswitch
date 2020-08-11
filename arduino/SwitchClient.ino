@@ -1,220 +1,244 @@
-/*
- *  This sketch sends data via HTTP GET requests to data.sparkfun.com service.
- *
- *  You need to get streamId and privateKey at data.sparkfun.com and paste them
- *  below. Or just customize this script to talk to other HTTP servers.
- *
- */
-
-#include <ESP8266WiFi.h>
+#include <Ethernet.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define OPEN_PIN        D7
-#define CLOSED_PIN      D5
-#define OPEN_LED_PIN    D1
-#define CLOSED_LED_PIN  D2
-#define ONE_WIRE_BUS    D3
+#define SWITCH          8
+#define GREEN_LED       6
+#define RED_LED         7
+#define ONE_WIRE_BUS    9
 
 // Enums for tracking door status
-#define OPEN     1
-#define CLOSED   0
+#define OPEN     0
+#define CLOSED   1
 #define UNKNOWN -1
 
-// Enums for specifying request types
-#define REQUEST_FAILED       -1
-#define REQUEST_FINISHED      0
-#define REQUEST_DOOR_EVENT    1
-#define REQUEST_TEMP_EVENT    2
-#define REQUEST_STATUS_CHECK  3
+// Enums for LED status
+#define OFF       0
+#define RED       1
+#define GREEN     2
+#define SOLID     3
+#define BLINK     4
+#define ALTERNATE 5
 
-// Interval for status checks, 300,000 ms = 5 minutes
-#define STATUS_INTERVAL 300000
-
-// Interval for temperature updates, 300,000 ms = 5 minutes
-#define TEMP_INTERVAL 300000
+#define STATUS_INTERVAL 300000  // Interval for switch status checks (ms)
+#define TEMP_INTERVAL   300000  // Interval for temperature updates (ms)
+#define FAIL_INTERVAL   10000   // Interval for retrying failed http requests (ms)
+#define BLINK_INTERVAL  500     // Interval between blinks (ms)
 
 // State tracking variables
-unsigned long last_status_check = -1;
-unsigned long last_temp_update = -1;
+unsigned long last_switch_update = -1;
+unsigned long last_temp_update = TEMP_INTERVAL;
+unsigned long last_blink = -1;
 int current_switch_status = UNKNOWN;
-int current_request_state = REQUEST_FINISHED;
-int led_flash = LOW;
+int blink_status = OFF; // Yes, these are different.
+bool blink_state = false; // Yes, these are different.
+bool online = false;
 
-const char* ssid     = "Enter Wifi SSID Here";
-const char* password = "Enter Wifi Password Here";
-
+//Network
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED }; //MAC address
 const char* host = "portal.hive13.org";
+EthernetClient client;
 
-// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+//Temperature Sensor
 OneWire oneWire(ONE_WIRE_BUS);
-
-// Pass our oneWire reference to Dallas Temperature. 
 DallasTemperature sensors(&oneWire);
-
-// arrays to hold device address
 DeviceAddress tempSensor;
 
-void setLED(int switchState) {
-  if(switchState == OPEN) {
-    digitalWrite(OPEN_LED_PIN, HIGH);
-    digitalWrite(CLOSED_LED_PIN, LOW);
-  } else if(switchState == CLOSED){
-    digitalWrite(OPEN_LED_PIN, LOW);
-    digitalWrite(CLOSED_LED_PIN, HIGH);
-  } else {
-    digitalWrite(OPEN_LED_PIN, HIGH);
-    digitalWrite(CLOSED_LED_PIN, HIGH);
+int switchState() {
+  int newstate = digitalRead(SWITCH); //Get current Switch Position
+  if (newstate != current_switch_status) {
+    current_switch_status = newstate;
+    return true; //return true if position has changed
+  }
+  else {
+    return false; //return false if position has not changed
   }
 }
 
-// Returns true if the switch has changed position since
-// the last time this function was called.
-bool checkSwitchStatus() {
-  int curPos = getSwitchPosition();
-  if(curPos != current_switch_status) {
-    current_switch_status = curPos;
-    return true;  // Switch position has changed.
+void setLED(int LEDSTATE) {
+  switch(LEDSTATE) {
+     case OFF:
+      digitalWrite(RED_LED, LOW);
+      digitalWrite(GREEN_LED, LOW);
+      blink_status=OFF;
+      break;
+    case RED:
+      digitalWrite(RED_LED, HIGH);
+      digitalWrite(GREEN_LED, LOW);
+      blink_status=OFF;
+      break;
+    case GREEN:
+      digitalWrite(GREEN_LED, HIGH);
+      digitalWrite(RED_LED, LOW);
+      blink_status=OFF;
+      break;
+    case SOLID:
+      digitalWrite(GREEN_LED, HIGH);
+      digitalWrite(RED_LED, HIGH);
+      blink_status=OFF;
+      break;
+    case ALTERNATE:
+      switch(blink_state) {
+        case true:
+          digitalWrite(GREEN_LED, HIGH);
+          digitalWrite(RED_LED, LOW);
+          blink_state = false;
+          break;
+        case false:
+          digitalWrite(GREEN_LED, LOW);
+          digitalWrite(RED_LED, HIGH);
+          blink_state = true;
+          break;
+      }
+      last_blink = millis();
+      break;
+    case BLINK:
+      switch(blink_state) {
+        case true:
+          digitalWrite(GREEN_LED, HIGH);
+          digitalWrite(RED_LED, HIGH);
+          blink_state = false;
+          break;
+        case false:
+          digitalWrite(GREEN_LED, LOW);
+          digitalWrite(RED_LED, LOW);
+          blink_state = true;
+          break;
+      }
+      last_blink = millis();
+      break;
+    }
+}
+
+bool logSwitch() {
+  String url="/isOpen/logger.php?switch=";
+  switch(current_switch_status) {
+    case OPEN:
+      url += "1";
+      break;
+    case CLOSED:
+      url += "0";
+      break;
   }
-  return false; // Switch position has not changed
+  return httpRequest(url);
 }
 
-// Returns OPEN, CLOSED depending on
-// the position of the door switch.
-int getSwitchPosition() {
-  Serial.println(digitalRead(OPEN_PIN));
-  return digitalRead(OPEN_PIN);
+bool logTemp(float tempf) {
+  String url="/isOpen/logger.php?temp=";
+  url += tempf;
+  return httpRequest(url);
 }
 
-void setup() {
-  Serial.begin(115200);
-  delay(10);
-
-  // We start by connecting to a WiFi network
-
-  Serial.println();
-  Serial.println();
+bool httpRequest(String requrl) {
+  Ethernet.maintain();
+  
   Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.print(host);
+  Serial.print("... ");
   
-  WiFi.begin(ssid, password);
-  
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("");
-  Serial.println("WiFi connected");  
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  
-    // Setup the digital IO pins
-  pinMode(OPEN_PIN,   INPUT_PULLUP);
-  pinMode(CLOSED_PIN, INPUT_PULLUP);
-  pinMode(OPEN_LED_PIN,   OUTPUT);
-  pinMode(CLOSED_LED_PIN, OUTPUT);
-  setLED(UNKNOWN);  // Turn on all LED's to indicate we are in "startup" mode.
-  
-  // Start setup for the temperature sensors
-  Serial.println("Setting up temperature sensor...");
-  sensors.begin();
-}
-
-bool startGetRequest(int requestType, int data) {
-  delay(500);
-
-  Serial.print("connecting to ");
-  Serial.println(host);
-  
-  // Use WiFiClient class to create TCP connections
-  WiFiClient client;
   const int httpPort = 80;
   if (!client.connect(host, httpPort)) {
-    Serial.println("connection failed");
-    return 0;
+    Serial.print("Failed! ");
+    return false;
   }
-  
-  // We now create a URI for the request
-  String url = "/isOpen/logger.php";
-  
-  switch(requestType) {
-    case REQUEST_DOOR_EVENT:
-      url += "?switch=";
-      url += data;
-      break;
-    case REQUEST_TEMP_EVENT:
-      url += "?temp=";
-      url += data;
-      break;
-    case REQUEST_FINISHED: // Should not occur, rather than error, lets continue.
-    case REQUEST_STATUS_CHECK:
-      // We can use the base request string.
-      break;
-  }
-  
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
   
   // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" + 
-               "Connection: close\r\n\r\n");
+  client.print(String("GET ")+requrl+" HTTP/1.1\r\n"+"Host: "+host+"\r\n"+"Connection: close\r\n\r\n");
   unsigned long timeout = millis();
   while (client.available() == 0) {
     if (millis() - timeout > 5000) {
-      Serial.println(">>> Client Timeout !");
+      Serial.print("Timeout! ");
       client.stop();
-      return 0;
+      return false;
     }
   }
   
-  // Read all the lines of the reply from server and print them to Serial
-  while(client.available()){
-    String line = client.readStringUntil('\r');
-    Serial.print(line);
-  }
-  
-  Serial.println();
-  Serial.println("closing connection");
-  return 1;
+  Serial.println("Success!");
+  return true;
 }
 
+void setup() {
+  //Initialize Serial Output
+  Serial.begin(115200);
+  
+  //Set inital pin states
+  pinMode(SWITCH, INPUT_PULLUP);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  setLED(SOLID); //Turn on all LEDs to indicate "startup" mode
 
-
-/*void loop() {
-  delay(5000);
-  startGetRequest(1,1);
-  if (WiFi.status() == WL_CONNECTED)
-*/
-
-int curPos = STATUS_INTERVAL;
+  while (!Serial) {}; // to prevent lost serial messages
+  Serial.println("Initializing.");
+  
+  // Set up temperature sensor
+  sensors.begin();
+  sensors.requestTemperatures();
+  
+  Ethernet.begin(mac);
+}
 
 void loop() {
-  Serial.println(millis() - last_status_check);
-  Serial.println(STATUS_INTERVAL);
-  Serial.println(getSwitchPosition());
-
-  delay(1000);
-  if (millis() - last_status_check > STATUS_INTERVAL) { // Is it time to check for a status update?
-    Serial.println("Checking status...");
-    if(startGetRequest(REQUEST_STATUS_CHECK, 0))
-      last_status_check = millis(); // Only update the "Last Check" time if the get request succeeded.
-  }
-  else if (millis() - last_temp_update > TEMP_INTERVAL) { // Is it time for a temperature update 'Get'?
-    Serial.println("Logging temperature...");
-    float tempC = sensors.getTempCByIndex(0);
-    sensors.requestTemperatures();
-    if(startGetRequest(REQUEST_TEMP_EVENT, DallasTemperature::toFahrenheit(tempC)))
-      last_temp_update = millis();  // Only update the "Last Update" time if the get request succeeded.
-  }
-  else if ((curPos = getSwitchPosition()) != current_switch_status) { // If switch position has changed perform 'Get'
-    Serial.print("Switch status is now: ");
-    Serial.println(current_switch_status, DEC);
-    if(startGetRequest(REQUEST_DOOR_EVENT, curPos)) {
-      setLED(curPos); // Only update the LED if get request succeeded.
-      current_switch_status = curPos; // Same goes for the saved status.
+  bool switchoverride = (millis() - last_switch_update > STATUS_INTERVAL);
+  if (switchState() || switchoverride) {
+    //setLED(SOLID);
+    if (switchoverride) { Serial.print("Update interval elapsed. Status "); }
+    else { Serial.print("Switch status changed to "); }
+    if (current_switch_status == OPEN) {
+      Serial.print("on. ");
+      if (logSwitch()) {
+        last_switch_update = millis();
+        setLED(GREEN);
+      } else {
+        Serial.print("Retry in ");
+        Serial.print(FAIL_INTERVAL/1000);
+        Serial.println("s.");
+        last_switch_update = millis() - STATUS_INTERVAL + FAIL_INTERVAL;
+        blink_status=BLINK;
+      }
+    } else if (current_switch_status == CLOSED) {
+      Serial.print("off. ");
+      if (logSwitch()) {
+        last_switch_update = millis();
+        setLED(RED);
+      } else {
+        Serial.print("Retry in ");
+        Serial.print(FAIL_INTERVAL/1000);
+        Serial.println("s.");
+        last_switch_update = millis() - STATUS_INTERVAL + FAIL_INTERVAL;
+        blink_status=BLINK;
+      }
+    } else {
+      Serial.println("Confused... ");
+      setLED(BLINK);
     }
   }
-  int curPos = -1;
+  if (millis() - last_temp_update > TEMP_INTERVAL) {
+    float tempF = DallasTemperature::toFahrenheit(sensors.getTempCByIndex(0));
+    sensors.requestTemperatures();
+    if (tempF != 185.00) {
+      Serial.print("Logging current temperature: ");
+      Serial.print(tempF);
+      Serial.print("°F. ");
+      if (logTemp(tempF)) {
+        last_temp_update = millis();
+      } else {
+        Serial.print("Retry in ");
+        Serial.print(FAIL_INTERVAL/1000);
+        Serial.println("s.");
+        last_temp_update = millis() - TEMP_INTERVAL + FAIL_INTERVAL;
+      }
+    }
+  }
+  if (blink_status != OFF) {
+    if (millis() - last_blink > BLINK_INTERVAL) {
+      switch(blink_status) {
+        case BLINK:
+          setLED(BLINK);
+          break;
+        case ALTERNATE:
+          setLED(ALTERNATE);
+          break;
+      }
+    }
+  }
 }
